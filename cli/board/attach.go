@@ -19,6 +19,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/arduino/arduino-cli/arduino/sketch"
 	"github.com/arduino/arduino-cli/cli/errorcodes"
 	"github.com/arduino/arduino-cli/cli/feedback"
 	"github.com/arduino/arduino-cli/cli/instance"
@@ -26,7 +27,6 @@ import (
 	"github.com/arduino/arduino-cli/commands/board"
 	rpc "github.com/arduino/arduino-cli/rpc/commands"
 	"github.com/arduino/go-paths-helper"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -60,8 +60,9 @@ func runAttachCommand(cmd *cobra.Command, args []string) {
 	var path *paths.Path
 	if len(args) > 1 {
 		path = paths.New(args[1])
-	} else {
-		path = initSketchPath(path)
+	} else if path, err = sketch.InitPath(path); err != nil {
+		feedback.Error(err)
+		os.Exit(errorcodes.ErrGeneric)
 	}
 
 	if _, err = board.Attach(context.Background(), &rpc.BoardAttachReq{
@@ -73,19 +74,4 @@ func runAttachCommand(cmd *cobra.Command, args []string) {
 		feedback.Errorf("Attach board error: %v", err)
 		os.Exit(errorcodes.ErrGeneric)
 	}
-}
-
-// initSketchPath returns the current working directory
-func initSketchPath(sketchPath *paths.Path) *paths.Path {
-	if sketchPath != nil {
-		return sketchPath
-	}
-
-	wd, err := paths.Getwd()
-	if err != nil {
-		feedback.Errorf("Couldn't get current working directory: %v", err)
-		os.Exit(errorcodes.ErrGeneric)
-	}
-	logrus.Infof("Reading sketch from dir: %s", wd)
-	return wd
 }

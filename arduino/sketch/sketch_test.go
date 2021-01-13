@@ -16,11 +16,13 @@
 package sketch_test
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/arduino/arduino-cli/arduino/sketch"
+	"github.com/arduino/go-paths-helper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,9 +45,9 @@ func TestNewItem(t *testing.T) {
 
 func TestSort(t *testing.T) {
 	items := []*sketch.Item{
-		&sketch.Item{"foo"},
-		&sketch.Item{"baz"},
-		&sketch.Item{"bar"},
+		{"foo"},
+		{"baz"},
+		{"bar"},
 	}
 
 	sort.Sort(sketch.ItemByPath(items))
@@ -70,4 +72,14 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, sketchFolderPath, sketch.LocationPath)
 	assert.Len(t, sketch.OtherSketchFiles, 0)
 	assert.Len(t, sketch.AdditionalFiles, 1)
+}
+
+func TestInitPath(t *testing.T) {
+	workingDir, _ := os.Getwd()
+	var invalidPath *paths.Path
+
+	path, err := sketch.InitPath(invalidPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, path)
+	assert.Equal(t, workingDir, path.String())
 }

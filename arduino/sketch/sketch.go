@@ -16,13 +16,16 @@
 package sketch
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/arduino/arduino-cli/arduino/globals"
+	"github.com/arduino/go-paths-helper"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // Item holds the source and the path for a single sketch file
@@ -122,4 +125,18 @@ func New(sketchFolderPath, mainFilePath, buildPath string, allFilesPaths []strin
 		OtherSketchFiles: otherSketchFiles,
 		AdditionalFiles:  additionalFiles,
 	}, nil
+}
+
+// InitPath returns the current working directory, if sketchPath is not nil that is returned instead
+func InitPath(sketchPath *paths.Path) (*paths.Path, error) {
+	if sketchPath != nil {
+		return sketchPath, nil
+	}
+
+	wd, err := paths.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't get current working directory: %w", err)
+	}
+	logrus.Infof("Reading sketch from dir: %s", wd)
+	return wd, nil
 }

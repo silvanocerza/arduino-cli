@@ -25,8 +25,6 @@ import (
 	"github.com/arduino/arduino-cli/commands/upload"
 	rpc "github.com/arduino/arduino-cli/rpc/commands"
 	"github.com/arduino/arduino-cli/table"
-	"github.com/arduino/go-paths-helper"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -79,21 +77,6 @@ func run(command *cobra.Command, args []string) {
 		os.Exit(errorcodes.ErrGeneric)
 	}
 	os.Exit(0)
-}
-
-// initSketchPath returns the current working directory
-func initSketchPath(sketchPath *paths.Path) *paths.Path {
-	if sketchPath != nil {
-		return sketchPath
-	}
-
-	wd, err := paths.Getwd()
-	if err != nil {
-		feedback.Errorf("Couldn't get current working directory: %v", err)
-		os.Exit(errorcodes.ErrGeneric)
-	}
-	logrus.Infof("Reading sketch from dir: %s", wd)
-	return wd
 }
 
 type programmersList struct {

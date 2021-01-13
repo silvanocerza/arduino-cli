@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"os"
 
+	"github.com/arduino/arduino-cli/arduino/sketch"
 	"github.com/arduino/arduino-cli/cli/feedback"
 	"github.com/arduino/arduino-cli/cli/output"
 	"github.com/arduino/arduino-cli/configuration"
@@ -31,7 +32,6 @@ import (
 	"github.com/arduino/arduino-cli/commands/upload"
 	rpc "github.com/arduino/arduino-cli/rpc/commands"
 	"github.com/arduino/go-paths-helper"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -126,7 +126,11 @@ func run(cmd *cobra.Command, args []string) {
 		path = paths.New(args[0])
 	}
 
-	sketchPath := initSketchPath(path)
+	sketchPath, err := sketch.InitPath(path)
+	if err != nil {
+		feedback.Error(err)
+		os.Exit(errorcodes.ErrGeneric)
+	}
 	// We must read this from settings since the value is set when the binding is accessed from viper,
 	// accessing it from cobra would only read it if the flag is explicitly set by the user and ignore
 	// the config file and the env vars.
@@ -216,21 +220,6 @@ func run(cmd *cobra.Command, args []string) {
 		feedback.Errorf("Error during build: %v", err)
 		os.Exit(errorcodes.ErrGeneric)
 	}
-}
-
-// initSketchPath returns the current working directory
-func initSketchPath(sketchPath *paths.Path) *paths.Path {
-	if sketchPath != nil {
-		return sketchPath
-	}
-
-	wd, err := paths.Getwd()
-	if err != nil {
-		feedback.Errorf("Couldn't get current working directory: %v", err)
-		os.Exit(errorcodes.ErrGeneric)
-	}
-	logrus.Infof("Reading sketch from dir: %s", wd)
-	return wd
 }
 
 type compileResult struct {

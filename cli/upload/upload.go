@@ -19,6 +19,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/arduino/arduino-cli/arduino/sketch"
 	"github.com/arduino/arduino-cli/cli/errorcodes"
 	"github.com/arduino/arduino-cli/cli/feedback"
 	"github.com/arduino/arduino-cli/cli/instance"
@@ -26,7 +27,6 @@ import (
 	rpc "github.com/arduino/arduino-cli/rpc/commands"
 	"github.com/arduino/arduino-cli/table"
 	"github.com/arduino/go-paths-helper"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -77,11 +77,13 @@ func run(command *cobra.Command, args []string) {
 		os.Exit(errorcodes.ErrGeneric)
 	}
 
-	var path *paths.Path
+	var sketchPath *paths.Path
 	if len(args) > 0 {
-		path = paths.New(args[0])
+		sketchPath = paths.New(args[0])
+	} else if sketchPath, err = sketch.InitPath(sketchPath); err != nil {
+		feedback.Error(err)
+		os.Exit(errorcodes.ErrGeneric)
 	}
-	sketchPath := initSketchPath(path)
 
 	if _, err := upload.Upload(context.Background(), &rpc.UploadReq{
 		Instance:   instance,
@@ -97,21 +99,6 @@ func run(command *cobra.Command, args []string) {
 		feedback.Errorf("Error during Upload: %v", err)
 		os.Exit(errorcodes.ErrGeneric)
 	}
-}
-
-// initSketchPath returns the current working directory
-func initSketchPath(sketchPath *paths.Path) *paths.Path {
-	if sketchPath != nil {
-		return sketchPath
-	}
-
-	wd, err := paths.Getwd()
-	if err != nil {
-		feedback.Errorf("Couldn't get current working directory: %v", err)
-		os.Exit(errorcodes.ErrGeneric)
-	}
-	logrus.Infof("Reading sketch from dir: %s", wd)
-	return wd
 }
 
 type programmersList struct {
