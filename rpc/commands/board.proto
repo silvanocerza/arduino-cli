@@ -158,14 +158,16 @@ message ConfigValue {
 message BoardAttachReq {
     // Arduino Core Service instance from the `Init` response.
     Instance instance = 1;
-    // The board's URI (e.g., /dev/ttyACM0).
-    string board_uri = 2;
     // Path of the sketch to attach the board to. The board attachment
     // metadata will be saved to `{sketch_path}/sketch.json`.
     string sketch_path = 3;
     // Duration in seconds to search the given URI for a connected board before
     // timing out. The default value is 5 seconds.
     string search_timeout = 4;
+    // Fully qualified board name of the target board (e.g., `arduino:avr:uno`).
+    string fqbn = 5;
+    // Address of the port (e.g., `//dev/ttyACM0`, `192.168.1.20`).
+    string address = 6;
 }
 
 message BoardAttachResp {
@@ -184,7 +186,7 @@ message BoardListResp {
 }
 
 message DetectedPort {
-    // Address of the port (e.g., `serial:///dev/ttyACM0`).
+    // Address of the port (e.g., `//dev/ttyACM0`).
     string address = 1;
     // Protocol of the port (e.g., `serial`).
     string protocol = 2;

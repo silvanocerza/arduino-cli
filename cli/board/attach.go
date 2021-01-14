@@ -32,15 +32,18 @@ import (
 
 func initAttachCommand() *cobra.Command {
 	attachCommand := &cobra.Command{
-		Use:   "attach <port>|<FQBN> [sketchPath]",
+		Use:   "attach",
 		Short: "Attaches a sketch to a board.",
 		Long:  "Attaches a sketch to a board.",
-		Example: "  " + os.Args[0] + " board attach serial:///dev/ttyACM0\n" +
-			"  " + os.Args[0] + " board attach serial:///dev/ttyACM0 HelloWorld\n" +
-			"  " + os.Args[0] + " board attach arduino:samd:mkr1000",
-		Args: cobra.RangeArgs(1, 2),
+		Example: "  " + os.Args[0] + " board attach --port /dev/ttyACM0\n" +
+			"  " + os.Args[0] + " board attach --port /dev/ttyACM0 HelloWorld\n" +
+			"  " + os.Args[0] + " board attach --fqbn arduino:samd:mkr1000" +
+			"  " + os.Args[0] + " board attach --fqbn arduino:avr:uno --port /dev/ttyACM0 /path/to/my/MySketch",
+		Args: cobra.MaximumNArgs(1),
 		Run:  runAttachCommand,
 	}
+	attachCommand.Flags().StringVarP(&attachFlags.fqbn, "fqbn", "b", "", "Fully Qualified Board Name, e.g.: arduino:avr:uno")
+	attachCommand.Flags().StringVarP(&attachFlags.port, "port", "p", "", "Upload port, e.g.: COM10 or /dev/ttyACM0")
 	attachCommand.Flags().StringVar(&attachFlags.searchTimeout, "timeout", "5s",
 		"The connected devices search timeout, raise it if your board doesn't show up (e.g. to 10s).")
 	return attachCommand
@@ -48,6 +51,8 @@ func initAttachCommand() *cobra.Command {
 
 var attachFlags struct {
 	searchTimeout string // Expressed in a parsable duration, is the timeout for the list and attach commands.
+	fqbn          string // Fully Qualified Board Name, e.g.: arduino:avr:uno.
+	port          string // Upload port, e.g.: COM10 or /dev/ttyACM0.
 }
 
 func runAttachCommand(cmd *cobra.Command, args []string) {
@@ -58,8 +63,8 @@ func runAttachCommand(cmd *cobra.Command, args []string) {
 	}
 
 	var path *paths.Path
-	if len(args) > 1 {
-		path = paths.New(args[1])
+	if len(args) > 0 {
+		path = paths.New(args[0])
 	} else if path, err = sketch.InitPath(path); err != nil {
 		feedback.Error(err)
 		os.Exit(errorcodes.ErrGeneric)
@@ -67,7 +72,8 @@ func runAttachCommand(cmd *cobra.Command, args []string) {
 
 	if _, err = board.Attach(context.Background(), &rpc.BoardAttachReq{
 		Instance:      instance,
-		BoardUri:      args[0],
+		Fqbn:          attachFlags.fqbn,
+		Address:       attachFlags.port,
 		SketchPath:    path.String(),
 		SearchTimeout: attachFlags.searchTimeout,
 	}, output.TaskProgress()); err != nil {
