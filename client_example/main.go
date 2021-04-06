@@ -18,6 +18,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -30,6 +31,7 @@ import (
 
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	dbg "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/debug/v1"
+	notifications "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/notifications/v1"
 	"github.com/arduino/arduino-cli/rpc/cc/arduino/cli/settings/v1"
 	"google.golang.org/grpc"
 )
@@ -115,6 +117,28 @@ func main() {
 	// run subsequent commands.
 	log.Println("calling Init")
 	instance := initInstance(client)
+
+	// This snippet is only for demostration purposes and no notification will ever be received
+	// cause of the way the client_example and the notification system work as of time of this writing.
+	// The client_example is meant to be run after the arduino-cli is launched in daemon mode,
+	// when launched the CLI always picks up the default settings in ~/.arduino15/arduino-cli.yaml
+	// folder (this is for Linux, different OSs have different paths), so when first run the current
+	// user' settings are loaded, that includes the path to the Sketchbook folder.
+	// In the client_example one of the first things we do is change the settings but write them in a different
+	// file to avoid polluting the current user' ones, this cause the hardware folder watcher to keep
+	// looking at the old folder, the one specified in the current user' config and not the one in the
+	// saved in the temp dir "/tmp/arduino-rpc-client<some_digits>".
+	// So here we receive no notificaiton.
+	// In a real world usage the CLI daemon must be restart for the watcher to notify for real changes.
+	notificationsService := notifications.NewNotificationsServiceClient(conn)
+	notificationsClient := initNotificationsClient(notificationsService)
+	log.Println("start waiting for notifications")
+	startWaitingNotifications(notificationsClient)
+	log.Println("create some fake platform")
+	createFakePlatform(settingsClient)
+	time.Sleep(1 * time.Second)
+	log.Println("stop waiting for notifications")
+	stopWaitingNotifications(notificationsClient)
 
 	// We set up the proxy and then run the update to verify that the proxy settings are currently used
 	log.Println("calling setProxy")
@@ -233,6 +257,55 @@ func main() {
 	// Uninstall a library
 	log.Println("calling LibraryUninstall(WiFi101)")
 	callLibUninstall(client, instance)
+}
+
+func initNotificationsClient(service notifications.NotificationsServiceClient) notifications.NotificationsService_GetNotificationsClient {
+	getNotificationsClient, err := service.GetNotifications(context.Background(), &notifications.GetNotificationsRequest{})
+	if err != nil {
+		log.Fatalf("Error creating Notifications service: %v", err)
+	}
+	return getNotificationsClient
+
+}
+
+func startWaitingNotifications(notificationsClient notifications.NotificationsService_GetNotificationsClient) {
+	go func() {
+		for {
+			notificationsResponse, err := notificationsClient.Recv()
+			// The server is done.
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatalf("Error when receiving notification: %v", err)
+			}
+			log.Printf("Received notification: %s", notificationsResponse.Notification)
+		}
+	}()
+}
+
+func createFakePlatform(client settings.SettingsServiceClient) {
+	getValueResp, err := client.GetValue(context.Background(), &settings.GetValueRequest{
+		Key: "directories.user",
+	})
+	if err != nil {
+		log.Fatalf("Error getting user dir: %v", err)
+	}
+
+	var userDir string
+	json.Unmarshal([]byte(getValueResp.GetJsonData()), &userDir)
+
+	fakePlatformDir := path.Join(userDir, "hardware", "fake-platform", "fake-arch")
+	log.Printf("fakePlatformDir: %v", fakePlatformDir)
+	if err := os.MkdirAll(fakePlatformDir, os.ModePerm); err != nil {
+		log.Fatalf("Cant' create fake platform: %v", err)
+	}
+}
+
+func stopWaitingNotifications(notificationsClient notifications.NotificationsService_GetNotificationsClient) {
+	if err := notificationsClient.CloseSend(); err != nil {
+		log.Fatalf("Error closing notifications client: %v", err)
+	}
 }
 
 func callVersion(client rpc.ArduinoCoreServiceClient) {
