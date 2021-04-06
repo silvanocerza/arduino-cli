@@ -33,6 +33,7 @@ import (
 	srv_commands "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	srv_debug "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/debug/v1"
 	srv_monitor "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/monitor/v1"
+	srv_notifications "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/notifications/v1"
 	srv_settings "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/settings/v1"
 	"github.com/segmentio/stats/v4"
 	"github.com/sirupsen/logrus"
@@ -84,6 +85,14 @@ func runDaemonCommand(cmd *cobra.Command, args []string) {
 
 	// Register the debug session service
 	srv_debug.RegisterDebugServiceServer(s, &daemon.DebugService{})
+
+	// Register notifications service
+	notificationService, err := daemon.NewNotificationService()
+	if err != nil {
+		feedback.Errorf("Failed to create notification service: %v", err)
+		os.Exit(errorcodes.ErrGeneric)
+	}
+	srv_notifications.RegisterNotificationsServiceServer(s, notificationService)
 
 	if !daemonize {
 		// When parent process ends terminate also the daemon
