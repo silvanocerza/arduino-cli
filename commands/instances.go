@@ -73,6 +73,15 @@ func GetInstance(id int32) *CoreInstance {
 	return instances[id]
 }
 
+// GetInstancesIds returns a list of IDs of all running CoreInstances
+func GetInstancesIds() []int32 {
+	ids := []int32{}
+	for id := range instances {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 // GetPackageManager returns a PackageManager for the given ID, or nil if
 // ID doesn't exist
 func GetPackageManager(id int32) *packagemanager.PackageManager {

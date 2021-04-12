@@ -16,6 +16,7 @@
 package daemon
 
 import (
+	"github.com/arduino/arduino-cli/commands"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/notifications/v1"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
@@ -25,7 +26,7 @@ import (
 type NotificationsService struct {
 	notificationsChan chan rpc.Notification
 
-	hardwareDirWatcher *hardwareDirWatcher
+	hardwareDirWatcher *HardwareDirWatcher
 }
 
 // NewNotificationService creates a new NotificationService.
@@ -40,13 +41,13 @@ func NewNotificationService() (*NotificationsService, error) {
 	// Creates a new hardware dir watcher, if a gRPC client changes
 	// the "directories.user" config the daemon must be reloaded otherwise
 	// changes on the new folder won't be received.
-	service.hardwareDirWatcher, err = newHardwareDirWatcher()
+	service.hardwareDirWatcher, err = NewHardwareDirWatcher()
 	if err != nil {
 		return nil, err
 	}
 
 	go func() {
-		for op := range service.hardwareDirWatcher.changesChannel() {
+		for op := range service.hardwareDirWatcher.ChangesChannel() {
 			switch op {
 			case fsnotify.Create:
 				fallthrough
@@ -56,11 +57,15 @@ func NewNotificationService() (*NotificationsService, error) {
 				fallthrough
 			case fsnotify.Rename:
 				logrus.Info("manually installed cores change detected")
+				// Updates all existing instances
+				for _, id := range commands.GetInstancesIds() {
+					commands.Rescan(id)
+				}
 				service.notificationsChan <- rpc.Notification_NOTIFICATION_CORE_CHANGED
 			}
 		}
 	}()
-	service.hardwareDirWatcher.start()
+	service.hardwareDirWatcher.Start()
 	return service, nil
 }
 
@@ -82,7 +87,7 @@ func (s *NotificationsService) GetNotifications(res *rpc.GetNotificationsRequest
 
 		if err := stream.Send(&rpc.GetNotificationsResponse{Notification: notification}); err != nil {
 			logrus.Info("stopping this shit")
-			s.hardwareDirWatcher.stop()
+			s.hardwareDirWatcher.Stop()
 			return err
 		}
 	}
