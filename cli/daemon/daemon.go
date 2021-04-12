@@ -27,6 +27,7 @@ import (
 	"github.com/arduino/arduino-cli/cli/errorcodes"
 	"github.com/arduino/arduino-cli/cli/feedback"
 	"github.com/arduino/arduino-cli/cli/globals"
+	"github.com/arduino/arduino-cli/commands"
 	"github.com/arduino/arduino-cli/commands/daemon"
 	"github.com/arduino/arduino-cli/configuration"
 	"github.com/arduino/arduino-cli/metrics"
@@ -34,6 +35,7 @@ import (
 	srv_debug "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/debug/v1"
 	srv_monitor "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/monitor/v1"
 	srv_settings "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/settings/v1"
+	"github.com/fsnotify/fsnotify"
 	"github.com/segmentio/stats/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -84,6 +86,32 @@ func runDaemonCommand(cmd *cobra.Command, args []string) {
 
 	// Register the debug session service
 	srv_debug.RegisterDebugServiceServer(s, &daemon.DebugService{})
+
+	hardwareWatcher, err := daemon.NewHardwareDirWatcher()
+	if err != nil {
+		feedback.Errorf("Failed to start hardware directory watcher: %v", err)
+		os.Exit(errorcodes.ErrGeneric)
+	}
+	defer hardwareWatcher.Stop()
+	go func() {
+		hardwareWatcher.Start()
+		for op := range hardwareWatcher.ChangesChannel() {
+			switch op {
+			case fsnotify.Create:
+				fallthrough
+			case fsnotify.Write:
+				fallthrough
+			case fsnotify.Remove:
+				fallthrough
+			case fsnotify.Rename:
+				logrus.Info("manually installed cores change detected")
+				// Updates all existing instances
+				for _, id := range commands.GetInstancesIds() {
+					commands.Rescan(id)
+				}
+			}
+		}
+	}()
 
 	if !daemonize {
 		// When parent process ends terminate also the daemon
