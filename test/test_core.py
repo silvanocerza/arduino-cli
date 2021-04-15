@@ -14,6 +14,7 @@
 # a commercial license, send an email to license@arduino.cc.
 import os
 import datetime
+import shutil
 import time
 import platform
 import pytest
@@ -530,3 +531,27 @@ def test_core_search_update_index_delay(run_command, data_dir):
     res = run_command("core search")
     assert res.ok
     assert "Updating index" not in res.stdout
+
+
+def test_core_with_wrong_custom_board_options_is_not_loaded(run_command, data_dir):
+    test_platform_name = "platform_with_wrong_custom_board_options"
+    platform_install_dir = Path(data_dir, "hardware", "arduino-beta-dev", test_platform_name)
+    platform_install_dir.mkdir(parents=True)
+
+    # Install platform in Sketchbook hardware dir
+    shutil.copytree(
+        Path(__file__).parent / "testdata" / test_platform_name, platform_install_dir, dirs_exist_ok=True,
+    )
+
+    res = run_command("update")
+    assert res.ok
+    assert "loading platform release: wrong custom board options for platform Arduino Test Boards" in res.stderr
+
+    res = run_command("core list --format json")
+    assert res.ok
+
+    cores = json.loads(res.stdout)
+    mapped = {core["id"]: core for core in cores}
+    assert len(mapped) == 0
+    assert "arduino-beta-dev:platform_with_wrong_custom_board_options" not in mapped
+    assert "loading platform release: wrong custom board options for platform Arduino Test Boards" in res.stderr

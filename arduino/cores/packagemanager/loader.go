@@ -333,12 +333,34 @@ func (pm *PackageManager) loadBoards(platform *cores.PlatformRelease) error {
 
 	propertiesByBoard := boardsProperties.FirstLevelOf()
 
-	platform.Menus = propertiesByBoard["menu"]
+	if menus, ok := propertiesByBoard["menu"]; ok {
+		platform.Menus = menus
+	} else {
+		platform.Menus = properties.NewMap()
+	}
 
-	delete(propertiesByBoard, "menu") // TODO: check this one
+	// This is not a board id so we remove it to correctly
+	// set all other boards properties
+	delete(propertiesByBoard, "menu")
 
 	for boardID, boardProperties := range propertiesByBoard {
-		boardProperties.Set("_id", boardID) // TODO: What is that for??
+		for _, key := range boardProperties.FirstLevelKeys() {
+			if key == "menu" && platform.Menus.Size() == 0 {
+				message := fmt.Sprintf("wrong custom board options for platform %s", platform.Platform.Name)
+				if maintainerEmail := platform.Platform.Package.Email; len(maintainerEmail) > 0 {
+					message = fmt.Sprintf("%s, please try updating the platform or contact the package maintainer at %s to fix the issue", message, maintainerEmail)
+				}
+				platformSpecificationURL := "https://arduino.github.io/arduino-cli/latest/platform-specification/#custom-board-options"
+				message = fmt.Sprintf("%s.\nFor more information on platform specification:\n%s", message, platformSpecificationURL)
+				return fmt.Errorf(message)
+			}
+		}
+		// The board's ID must be available in a board's properties since it can
+		// be used in all configuration files for several reasons, like settings compilation
+		// flags depending on the board id.
+		// For more info:
+		// https://arduino.github.io/arduino-cli/latest/platform-specification/#global-predefined-properties
+		boardProperties.Set("_id", boardID)
 		board := platform.GetOrCreateBoard(boardID)
 		board.Properties.Merge(boardProperties)
 	}
