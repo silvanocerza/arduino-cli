@@ -38,7 +38,7 @@ var (
 	// ErrNotFound is returned when the API returns 404
 	ErrNotFound = errors.New("board not found")
 	m           sync.Mutex
-	vidPidURL   = "https://builder.arduino.cc/v3/boards/byVidPid"
+	vidPidURL   = "https://builder-dev.arduino.cc/v3/boards/byVidPid"
 	validVidPid = regexp.MustCompile(`0[xX][a-fA-F\d]{4}`)
 )
 
